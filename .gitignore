@@ -1,0 +1,23 @@
+
+---
+
+
+This keeps unnecessary files (venv, node_modules, etc.) out of GitHub.
+
+```bash
+
+
+__pycache__/
+*.pyc
+venv/
+.env
+
+
+node_modules/
+dist/
+.vite/
+.env.local
+
+
+.DS_Store
+Thumbs.db
