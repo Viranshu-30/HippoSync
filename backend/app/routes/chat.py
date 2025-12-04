@@ -13,7 +13,7 @@ from ..auth import get_current_user, get_db, get_user_api_keys
 from ..config import settings
 from ..schemas import ChatResponse
 from ..models import Thread, ProjectMember, Message
-# ✅ V2 IMPORT - Updated for MemMachine V2
+
 from .. import memmachine_client
 from ..utils.parser import sniff_and_read
 from ..utils.memory import chunk_text
@@ -100,7 +100,7 @@ def extract_profile_facts(message: str, response: str) -> list[str]:
         matches = re.finditer(pattern, message, re.IGNORECASE)
         for match in matches:
             value = match.group(1).strip()
-            if len(value) > 2 and len(value) < 100:  # Reasonable length
+            if len(value) > 2 and len(value) < 100:  
                 if fact_type == 'location':
                     facts.append(f"User lives in {value}")
                 elif fact_type == 'name':
@@ -981,3 +981,4 @@ def chat_endpoint(
         db.rollback()
         logger.error(f"Chat error: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=str(e))
+    

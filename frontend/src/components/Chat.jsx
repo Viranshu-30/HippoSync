@@ -5,6 +5,7 @@ import MessageInput from './MessageInput';
 import SettingsModal from './SettingsModal';
 import Sidebar from './Sidebar';
 import APIKeyPrompt from './APIKeyPrompt';
+import ProjectModal from './ProjectModal';  // ← NEW: Import ProjectModal
 
 // SVG Icons
 const EditIcon = () => (
@@ -67,6 +68,13 @@ export default function Chat({ user }) {
   const [checkingKeys, setCheckingKeys] = useState(true);
   const [models, setModels] = useState({ openai: [], anthropic: [], google: [] });
   const [modelDropdownOpen, setModelDropdownOpen] = useState(false);
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // NEW: Project modal state
+  // ═══════════════════════════════════════════════════════════════════════
+  const [projectModalOpen, setProjectModalOpen] = useState(false);
+  const [projectModalMode, setProjectModalMode] = useState('create'); // 'create' or 'invite'
+  const [selectedProject, setSelectedProject] = useState(null);
 
   const sessionId = useMemo(() => `sess-${user.id}`, [user.id]);
 
@@ -202,6 +210,50 @@ export default function Chat({ user }) {
       alert(`Failed to create new chat: ${error.response?.data?.detail || error.message}`);
     }
   };
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // NEW: Project handler functions
+  // ═══════════════════════════════════════════════════════════════════════
+
+  // Handle creating new project
+  const handleNewProject = () => {
+    setSelectedProject(null);
+    setProjectModalMode('create');
+    setProjectModalOpen(true);
+  };
+
+  // Handle inviting member to project
+  const handleInvite = (project) => {
+    setSelectedProject(project);
+    setProjectModalMode('invite');
+    setProjectModalOpen(true);
+  };
+
+  // Handle project modal save
+  const handleProjectModalSave = async (data) => {
+    try {
+      if (projectModalMode === 'create') {
+        // Create new project
+        const res = await api.post('/projects', data);
+        console.log('Project created:', res.data);
+        setProjectModalOpen(false);
+        window.dispatchEvent(new Event('refresh-threads'));
+      } else if (projectModalMode === 'invite') {
+        // Invite member to project
+        const res = await api.post(`/projects/${selectedProject.id}/members`, data);
+        console.log('Member invited:', res.data);
+        if (res.data.status === 'already_member') {
+          alert('User is already a member of this project');
+        }
+        setProjectModalOpen(false);
+      }
+    } catch (error) {
+      console.error('Project operation failed:', error);
+      throw error; // Let ProjectModal handle the error
+    }
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════
 
   const renameChat = async () => {
     if (!thread) return alert('No chat selected');
@@ -495,6 +547,8 @@ export default function Chat({ user }) {
         selected={thread}
         onSelectThread={selectThread}
         onNewPersonal={newPersonal}
+        onNewProject={handleNewProject}  
+        onInvite={handleInvite}          
       />
 
       {/* Main Chat Area */}
@@ -602,6 +656,17 @@ export default function Chat({ user }) {
           onClose={() => setSettingsOpen(false)}
           settings={config}
           onSave={handleModelChange}
+        />
+
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        {/* NEW: Project Modal */}
+        {/* ═══════════════════════════════════════════════════════════════ */}
+        <ProjectModal
+          open={projectModalOpen}
+          onClose={() => setProjectModalOpen(false)}
+          project={selectedProject}
+          onSave={handleProjectModalSave}
+          mode={projectModalMode}
         />
       </div>
     </div>
