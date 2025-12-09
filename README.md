@@ -100,7 +100,7 @@ APP_URL=http://localhost:5173
 APP_NAME=HippoSync
 
 # MemMachine Configuration
-MEMMACHINE_BASE_URL=http://localhost:8001
+MEMMACHINE_BASE_URL=http://localhost:8000
 
 # CORS
 CORS_ORIGINS=http://localhost:5173,http://localhost:3000
