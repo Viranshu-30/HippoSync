@@ -238,7 +238,7 @@ pip install -r requirements.txt
 # Mac/Linux: lsof -ti:8000 | xargs kill -9
 
 # Or use different port
-python -m uvicorn app.main:app --reload --port 8001
+python -m uvicorn app.main:app --reload --port 8000
 ```
 
 #### "MemMachine connection refused"
