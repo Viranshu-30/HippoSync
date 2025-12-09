@@ -116,12 +116,9 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 4. Generate password for "Mail"
 5. Copy the 16-character password to `SMTP_PASSWORD` in `.env`
 
-#### 2.5 Install and Start MemMachine
+#### 2.5 Start MemMachine
 
 ```bash
-# Install MemMachine
-pip install memmachine
-
 # Start MemMachine server (in a separate terminal)
 memmachine serve
 ```
