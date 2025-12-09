@@ -1,10 +1,126 @@
 """
-Enhanced schemas.py with multi-provider support and flexible API key management.
-⭐ UPDATED: No API keys required at signup! Added location & profile schemas.
+Enhanced schemas.py with STRONG email and password validation
+✅ Email validation: Format, domain, disposable email blocking
+✅ Password validation: Length, complexity, common passwords
 """
 from pydantic import BaseModel, EmailStr, Field, validator
 from typing import Optional, List, Any, Dict
 from datetime import datetime
+import re
+
+
+# ============================================================================
+# VALIDATION UTILITIES
+# ============================================================================
+
+# Common disposable email domains to block
+DISPOSABLE_EMAIL_DOMAINS = {
+    'tempmail.com', 'throwaway.email', 'guerrillamail.com', 'mailinator.com',
+    '10minutemail.com', 'trashmail.com', 'fakeinbox.com', 'temp-mail.org',
+    'yopmail.com', 'maildrop.cc', 'getnada.com', 'guerrillamailblock.com',
+    'sharklasers.com', 'spam4.me', 'grr.la', 'getairmail.com'
+}
+
+# Common weak passwords to reject
+COMMON_PASSWORDS = {
+    'password', '123456', '12345678', 'qwerty', 'abc123', 'monkey',
+    'letmein', 'trustno1', 'dragon', 'baseball', 'iloveyou', 'master',
+    'sunshine', 'ashley', 'bailey', 'shadow', 'superman', 'password1',
+    '123456789', '12345', '1234567', 'password123', 'admin', 'welcome'
+}
+
+
+def validate_email_domain(email: str) -> bool:
+    """
+    Validate email domain is legitimate (not disposable/temporary)
+    
+    Args:
+        email: Email address to validate
+    
+    Returns:
+        True if domain is legitimate, False otherwise
+    """
+    try:
+        domain = email.split('@')[1].lower()
+        
+        # Block disposable email domains
+        if domain in DISPOSABLE_EMAIL_DOMAINS:
+            return False
+        
+        # Block obvious test domains
+        if 'test' in domain or 'example' in domain or 'temp' in domain:
+            return False
+        
+        # Domain should have at least one dot (e.g., gmail.com)
+        if '.' not in domain:
+            return False
+        
+        return True
+    except (IndexError, AttributeError):
+        return False
+
+
+def validate_password_strength(password: str) -> tuple[bool, str]:
+    """
+    Validate password strength with comprehensive checks
+    
+    Requirements:
+    - Minimum 8 characters
+    - At least 1 uppercase letter
+    - At least 1 lowercase letter
+    - At least 1 number
+    - At least 1 special character
+    - Not a common password
+    - No sequential characters (123, abc)
+    
+    Args:
+        password: Password to validate
+    
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    # Length check
+    if len(password) < 8:
+        return False, "Password must be at least 8 characters long"
+    
+    # Maximum length (prevent DoS)
+    if len(password) > 128:
+        return False, "Password must be less than 128 characters"
+    
+    # Common password check
+    if password.lower() in COMMON_PASSWORDS:
+        return False, "Password is too common. Please choose a stronger password"
+    
+    # Complexity checks
+    has_upper = bool(re.search(r'[A-Z]', password))
+    has_lower = bool(re.search(r'[a-z]', password))
+    has_digit = bool(re.search(r'\d', password))
+    has_special = bool(re.search(r'[!@#$%^&*(),.?":{}|<>_\-+=\[\]\\\/;`~]', password))
+    
+    if not has_upper:
+        return False, "Password must contain at least one uppercase letter"
+    
+    if not has_lower:
+        return False, "Password must contain at least one lowercase letter"
+    
+    if not has_digit:
+        return False, "Password must contain at least one number"
+    
+    if not has_special:
+        return False, "Password must contain at least one special character (!@#$%^&*...)"
+    
+    # Sequential characters check
+    sequences = ['123', '234', '345', '456', '567', '678', '789', 
+                 'abc', 'bcd', 'cde', 'def', 'efg', 'fgh']
+    for seq in sequences:
+        if seq in password.lower():
+            return False, "Password contains sequential characters. Please choose a more complex password"
+    
+    # Repeated characters check (e.g., "aaa", "111")
+    if re.search(r'(.)\1{2,}', password):
+        return False, "Password contains repeated characters. Please choose a more varied password"
+    
+    return True, ""
 
 
 # ============================================================================
@@ -13,15 +129,19 @@ from datetime import datetime
 
 class UserCreate(BaseModel):
     """
+    Enhanced user creation with strong validation
     API keys can be added later in settings.
-    Accepts optional location data from geolocation.
     """
     email: EmailStr
-    password: str = Field(min_length=6, description="Password (min 6 characters)")
+    password: str = Field(
+        min_length=8,
+        max_length=128,
+        description="Strong password (min 8 chars, must contain uppercase, lowercase, number, special char)"
+    )
     
-    #  Optional profile fields
-    name: Optional[str] = Field(None, description="User's name")
-    occupation: Optional[str] = Field(None, description="User's occupation")
+    # Optional profile fields
+    name: Optional[str] = Field(None, max_length=100, description="User's name")
+    occupation: Optional[str] = Field(None, max_length=100, description="User's occupation")
     
     # Optional location from geolocation
     location_city: Optional[str] = None
@@ -32,17 +152,80 @@ class UserCreate(BaseModel):
     location_timezone: Optional[str] = None
     location_formatted: Optional[str] = None
     
+    @validator('email')
+    def validate_email(cls, v):
+        """
+        Enhanced email validation
+        - Checks for legitimate domain
+        - Blocks disposable/temporary emails
+        """
+        email_str = str(v).lower()
+        
+        # Check domain legitimacy
+        if not validate_email_domain(email_str):
+            raise ValueError(
+                'Please use a legitimate email address. '
+                'Disposable or temporary email services are not allowed.'
+            )
+        
+        # Additional format checks
+        if email_str.count('@') != 1:
+            raise ValueError('Invalid email format')
+        
+        local_part, domain = email_str.split('@')
+        
+        # Local part should not be too short or too long
+        if len(local_part) < 1 or len(local_part) > 64:
+            raise ValueError('Email local part must be between 1 and 64 characters')
+        
+        # Domain should be reasonable length
+        if len(domain) < 3 or len(domain) > 255:
+            raise ValueError('Email domain is invalid')
+        
+        return v
+    
     @validator('password')
     def validate_password(cls, v):
-        if len(v) < 6:
-            raise ValueError('Password must be at least 6 characters')
+        """
+        Enhanced password validation with strength requirements
+        """
+        is_valid, error_msg = validate_password_strength(v)
+        
+        if not is_valid:
+            raise ValueError(error_msg)
+        
+        return v
+    
+    @validator('name')
+    def validate_name(cls, v):
+        """Validate name if provided"""
+        if v is not None:
+            v = v.strip()
+            if len(v) == 0:
+                return None
+            if len(v) > 100:
+                raise ValueError('Name must be less than 100 characters')
+            # Name should contain only letters, spaces, and common punctuation
+            if not re.match(r'^[a-zA-Z\s\'\-\.]+$', v):
+                raise ValueError('Name contains invalid characters')
+        return v
+    
+    @validator('occupation')
+    def validate_occupation(cls, v):
+        """Validate occupation if provided"""
+        if v is not None:
+            v = v.strip()
+            if len(v) == 0:
+                return None
+            if len(v) > 100:
+                raise ValueError('Occupation must be less than 100 characters')
         return v
     
     class Config:
         json_schema_extra = {
             "example": {
-                "email": "user@example.com",
-                "password": "securepass123",
+                "email": "user@gmail.com",
+                "password": "SecureP@ss123",
                 "name": "John Doe",
                 "occupation": "ML Engineer"
             }
@@ -64,14 +247,13 @@ class UserOut(BaseModel):
     has_google_key: bool = False
     has_tavily_key: bool = False
     
-    # Backward compatibility property
     @property
     def has_api_key(self) -> bool:
         """For backward compatibility with old code"""
         return self.has_openai_key or self.has_anthropic_key or self.has_google_key
     
     class Config:
-        from_attributes = True  # Pydantic v2
+        from_attributes = True
 
 
 class UserUpdateApiKeys(BaseModel):
@@ -163,7 +345,7 @@ class ChatResponse(BaseModel):
     used_memory: bool = False
     used_web_search: bool = False
     memory_count: Optional[int] = None
-    used_context: List[str] = []  # For backward compatibility
+    used_context: List[str] = []
 
 
 class MessageOut(BaseModel):
@@ -294,7 +476,7 @@ class MemorySearchRequest(BaseModel):
 class MemoryItem(BaseModel):
     """Individual memory item"""
     content: str
-    type: str  # profile, episodic
+    type: str
     thread_id: Optional[int] = None
     created_at: Optional[str] = None
     relevance_score: Optional[float] = None
@@ -353,7 +535,7 @@ class ApiKeysSave(BaseModel):
 
 
 # ============================================================================
-#  USER SETTINGS SCHEMAS
+# USER SETTINGS SCHEMAS
 # ============================================================================
 
 class UserSettings(BaseModel):
@@ -364,7 +546,7 @@ class UserSettings(BaseModel):
 
 
 # ============================================================================
-#  LOCATION DATA SCHEMA
+# LOCATION DATA SCHEMA
 # ============================================================================
 
 class LocationData(BaseModel):

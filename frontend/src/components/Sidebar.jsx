@@ -137,7 +137,7 @@ export default function Sidebar({
             </svg>
           </div>
           <div>
-            <h1 className="text-xl font-bold gradient-text">PrivateGPT</h1>
+            <h1 className="text-xl font-bold gradient-text">HippoSync</h1>
             <p className="text-xs text-[var(--text-muted)]">Your AI Assistant with Memory</p>
           </div>
         </div>

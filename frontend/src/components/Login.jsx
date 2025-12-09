@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { api } from '../api';
 
 const LockIcon = () => (
@@ -21,15 +22,26 @@ const KeyIcon = () => (
   </svg>
 );
 
+const AlertIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <circle cx="12" cy="12" r="10"></circle>
+    <line x1="12" y1="8" x2="12" y2="12"></line>
+    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+  </svg>
+);
+
 export default function Login({ onLoggedIn }) {
+  const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [needsVerification, setNeedsVerification] = useState(false);
 
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
+    setNeedsVerification(false);
     setLoading(true);
 
     try {
@@ -39,10 +51,22 @@ export default function Login({ onLoggedIn }) {
       const res = await api.post('/auth/login', form);
       onLoggedIn(res.data.access_token);
     } catch (e) {
-      setError(e.response?.data?.detail || 'Login failed. Please check your credentials.');
+      const errorDetail = e.response?.data?.detail || 'Login failed. Please check your credentials.';
+      
+      // Check if it's an email verification error
+      if (e.response?.status === 403 || errorDetail.toLowerCase().includes('verify your email')) {
+        setNeedsVerification(true);
+        setError(errorDetail);
+      } else {
+        setError(errorDetail);
+      }
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleResendVerification = () => {
+    navigate('/verify-email', { state: { email } });
   };
 
   return (
@@ -65,7 +89,7 @@ export default function Login({ onLoggedIn }) {
               Welcome Back
             </h1>
             <p className="text-[var(--text-muted)]">
-              Sign in to continue to PrivateGPT
+              Sign in to continue to HippoSync
             </p>
           </div>
 
@@ -116,7 +140,21 @@ export default function Login({ onLoggedIn }) {
             {/* Error Message */}
             {error && (
               <div className="p-4 rounded-xl bg-red-900/20 border border-red-700/50">
-                <p className="text-sm text-red-400">{error}</p>
+                <p className="text-sm text-red-400 flex items-start gap-2">
+                  <AlertIcon className="flex-shrink-0 mt-0.5" />
+                  <span>{error}</span>
+                </p>
+                
+                {/* Resend Verification Button */}
+                {needsVerification && email && (
+                  <button
+                    type="button"
+                    onClick={handleResendVerification}
+                    className="mt-3 text-sm text-[var(--gradient-mid)] hover:text-[var(--gradient-end)] font-medium underline"
+                  >
+                    → Resend verification email
+                  </button>
+                )}
               </div>
             )}
 
@@ -138,6 +176,19 @@ export default function Login({ onLoggedIn }) {
                 'Sign In'
               )}
             </button>
+
+            {/* Sign Up Link */}
+            <div className="text-center text-sm text-[var(--text-muted)]">
+              Don't have an account?{' '}
+              <button
+                type="button"
+                onClick={() => navigate('/signup')}
+                className="text-[var(--gradient-mid)] hover:text-[var(--gradient-end)] font-medium transition-colors"
+                disabled={loading}
+              >
+                Create Account
+              </button>
+            </div>
           </form>
         </div>
 

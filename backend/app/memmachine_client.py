@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 # MemMachine V2 Configuration
 BASE = settings.memmachine_base_url
-APP_ORG_ID = "privategpt"  # Shared org for team projects
+APP_ORG_ID = "HippoSync"  # Shared org for team projects
 
 
 def _get_org_and_project(user_id: int, project_id: Optional[int] = None) -> tuple[str, str]:
@@ -26,7 +26,7 @@ def _get_org_and_project(user_id: int, project_id: Optional[int] = None) -> tupl
     
     HYBRID ARCHITECTURE:
     - Personal threads: org_id = "user-{id}", project_id = "personal"
-    - Team projects: org_id = "privategpt", project_id = "proj-{id}"
+    - Team projects: org_id = "HippoSync", project_id = "proj-{id}"
     
     Args:
         user_id: User ID
@@ -127,7 +127,7 @@ def add_memory(
         "thread_id": str(thread_id),
         "user_id": str(user_id),
         "role": role,
-        "source": "privategpt"
+        "source": "HippoSync"
     })
     
     if project_id:
@@ -210,7 +210,7 @@ def add_semantic_memory(
     meta.update({
         "user_id": str(user_id),
         "type": "semantic",
-        "source": "privategpt"
+        "source": "HippoSync"
     })
     
     if project_id:

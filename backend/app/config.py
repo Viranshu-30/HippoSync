@@ -20,18 +20,26 @@ class Settings(BaseSettings):
     # Tavily API configuration
     tavily_api_key: Optional[str] = None
 
-    # MemMachine V2 Configuration
-    # NOTE: V2 uses /api/v2/* endpoints
     memmachine_base_url: str = "http://localhost:8080"
-    
-    # Deprecated V1 settings (kept for compatibility, not used)
-    memmachine_group_prefix: str = "group"  # Not used in V2
-    memmachine_agent_id: str = "web-assistant"  # Not used in V2
+    memmachine_group_prefix: str = "group"
+    memmachine_agent_id: str = "web-assistant"
+
+    # Email configuration for verification
+    email_provider: str = "smtp"
+    smtp_host: str = "smtp.gmail.com"
+    smtp_port: int = 587
+    smtp_username: str = ""
+    smtp_password: str = ""
+    smtp_use_tls: str = "true"
+    from_email: str = "noreply@HippoSync.com"
+    from_name: str = "HippoSync"
+    app_url: str = "http://localhost:5173"
+    app_name: str = "HippoSync"
 
     model_config = SettingsConfigDict(
-        env_file=(".env", "../.env"), 
-        env_file_encoding="utf-8", 
-        case_sensitive=False
-    )
+    env_file=(".env", "../.env"), 
+    env_file_encoding="utf-8", 
+    case_sensitive=False
+)
 
 settings = Settings()

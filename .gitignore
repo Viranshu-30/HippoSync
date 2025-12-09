@@ -1,23 +1,78 @@
-
----
-
-
-This keeps unnecessary files (venv, node_modules, etc.) out of GitHub.
-
-```bash
-
-
+# Python
 __pycache__/
-*.pyc
-venv/
-.env
-
-
-node_modules/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
 dist/
-.vite/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+venv/
+env/
+ENV/
+.venv
+
+# Database
+*.db
+*.db-journal
+*.sqlite
+*.sqlite3
+app.db
+app.db.encrypted
+
+# Environment Variables
+.env
 .env.local
+.env.production
 
-
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
 .DS_Store
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+build/
+
+# Logs
+*.log
+logs/
+
+# OS
 Thumbs.db
+.DS_Store
+
+# MemMachine
+memmachine_data/
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.backup
+
+# API Keys (extra safety)
+*secret*
+*key*.txt
+
+.gitignore

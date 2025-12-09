@@ -1,7 +1,10 @@
 """
-Enhanced auth.py with multi-provider API key management.
+Enhanced auth.py with multi-provider API key management + EMAIL VERIFICATION.
 Supports OpenAI, Anthropic Claude, Google Gemini, and Tavily.
 ✅ UPDATED FOR MEMMACHINE V2
+✅ NEW: Email verification with token
+✅ NEW: Verification email sending
+✅ NEW: Resend verification endpoint
 """
 from datetime import datetime, timedelta, timezone  
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -11,6 +14,7 @@ from passlib.context import CryptContext
 import jwt
 from typing import Optional, Dict, Any
 from uuid import uuid4
+import secrets
 import logging
 
 from .config import settings
@@ -22,6 +26,7 @@ from .utils.encryption import (
     validate_openai_api_key, validate_anthropic_api_key,
     validate_google_api_key, validate_tavily_api_key
 )
+from .utils.email_service import email_service
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 logger = logging.getLogger(__name__)
@@ -54,6 +59,11 @@ def get_password_hash(password: str) -> str:
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify password against hash"""
     return pwd_context.verify(plain_password, hashed_password)
+
+
+def generate_verification_token() -> str:
+    """Generate secure random verification token"""
+    return secrets.token_urlsafe(32)
 
 
 # ============================================================================
@@ -191,14 +201,24 @@ def has_any_provider_key(user: User) -> bool:
 @router.post("/signup", response_model=UserOut)
 def signup(user_data: UserCreate, db: Session = Depends(get_db)):
     """
-    Register new user.
+    Register new user with EMAIL VERIFICATION.
     API keys can be added later in settings via the just-in-time flow.
     Accepts optional location data from geolocation.
+    
+    Workflow:
+    1. Create user account (email_verified=False)
+    2. Generate verification token (expires in 24 hours)
+    3. Send verification email
+    4. Return user data
     """
     # Check if user exists
     existing = db.query(User).filter(User.email == user_data.email).first()
     if existing:
         raise HTTPException(status_code=400, detail="Email already registered")
+    
+    # Generate verification token (expires in 24 hours)
+    verification_token = generate_verification_token()
+    token_expires = datetime.now(tz=timezone.utc) + timedelta(hours=24)
     
     user = User(
         email=user_data.email,
@@ -213,18 +233,39 @@ def signup(user_data: UserCreate, db: Session = Depends(get_db)):
         location_timezone=user_data.location_timezone,
         location_formatted=user_data.location_formatted,
         location_updated_at=datetime.utcnow() if user_data.location_city else None,
+        # Email verification fields
+        email_verified=False,
+        verification_token=verification_token,
+        verification_token_expires=token_expires,
     )
     
     db.add(user)
     db.commit()
     db.refresh(user)
     
-    logger.info(f"✅ New user registered: {user.email}")
+    logger.info(f"✅ New user registered: {user.email} (ID: {user.id})")
+    
+    # Send verification email
+    try:
+        email_sent = email_service.send_verification_email(
+            to_email=user.email,
+            verification_token=verification_token,
+            user_name=user.name
+        )
+        
+        if email_sent:
+            logger.info(f"📧 Verification email sent to {user.email}")
+        else:
+            logger.warning(f"⚠️ Failed to send verification email to {user.email}")
+    except Exception as e:
+        logger.error(f"❌ Error sending verification email: {e}")
+        # Don't fail signup if email fails
     
     return UserOut(
         id=user.id,
         email=user.email,
-        has_openai_key=False,  # No keys at signup!
+        email_verified=False,
+        has_openai_key=False,
         has_anthropic_key=False,
         has_google_key=False,
         has_tavily_key=False,
@@ -239,6 +280,8 @@ def login(
     """
     Login with email and password.
     User can add API keys later via just-in-time flow.
+    
+    ✅ REQUIRES EMAIL VERIFICATION
     """
     user = db.query(User).filter(User.email == form_data.username).first()
     
@@ -248,8 +291,133 @@ def login(
             detail="Incorrect email or password"
         )
     
+    # ✅ CHECK EMAIL VERIFICATION
+    if not getattr(user, 'email_verified', False):
+        raise HTTPException(
+            status_code=403,
+            detail="Please verify your email before logging in. Check your inbox for the verification link."
+        )
+    
     token = create_access_token({"sub": str(user.id)})
+    
+    logger.info(f"✅ User logged in: {user.email} (verified: {getattr(user, 'email_verified', False)})")
+    
     return {"access_token": token, "token_type": "bearer"}
+
+
+@router.get("/verify-email")
+def verify_email(token: str, db: Session = Depends(get_db)):
+    """
+    Verify user email with token
+    
+    Args:
+        token: Verification token from email link
+    
+    Returns:
+        Success message or error
+    """
+    # Find user with this token
+    user = db.query(User).filter(User.verification_token == token).first()
+    
+    if not user:
+        raise HTTPException(
+            status_code=400,
+            detail="Invalid verification token. Please request a new verification email."
+        )
+    
+    # Check if already verified
+    if user.email_verified:
+        return {
+            "status": "already_verified",
+            "message": "Email already verified. You can login now!"
+        }
+    
+    # Check if token expired
+    # Handle both timezone-aware and timezone-naive datetimes
+    now = datetime.now(tz=timezone.utc)
+    expires = user.verification_token_expires
+    
+    # If expires is naive, make it aware (assume UTC)
+    if expires.tzinfo is None:
+        expires = expires.replace(tzinfo=timezone.utc)
+    
+    if expires < now:
+        raise HTTPException(
+            status_code=400,
+            detail="Verification token expired. Please request a new verification email."
+        )
+    
+    # Verify email
+    user.email_verified = True
+    user.verified_at = datetime.now(tz=timezone.utc)
+    user.verification_token = None  # Clear token
+    user.verification_token_expires = None
+    
+    db.commit()
+    
+    logger.info(f"✅ Email verified for user: {user.email}")
+    
+    return {
+        "status": "success",
+        "message": "Email verified successfully! You can now login and use all features.",
+        "email": user.email
+    }
+
+
+@router.post("/resend-verification")
+def resend_verification(email: str, db: Session = Depends(get_db)):
+    """
+    Resend verification email
+    
+    Args:
+        email: User's email address
+    
+    Returns:
+        Success message
+    """
+    user = db.query(User).filter(User.email == email).first()
+    
+    if not user:
+        # Don't reveal if email exists for security
+        return {
+            "status": "sent",
+            "message": "If this email is registered, a verification link has been sent."
+        }
+    
+    if user.email_verified:
+        return {
+            "status": "already_verified",
+            "message": "Email already verified. You can login now!"
+        }
+    
+    # Generate new token
+    verification_token = generate_verification_token()
+    token_expires = datetime.now(tz=timezone.utc) + timedelta(hours=24)
+    
+    user.verification_token = verification_token
+    user.verification_token_expires = token_expires
+    
+    db.commit()
+    
+    # Send email
+    try:
+        email_sent = email_service.send_verification_email(
+            to_email=user.email,
+            verification_token=verification_token,
+            user_name=user.name
+        )
+        
+        if email_sent:
+            logger.info(f"📧 Verification email resent to {user.email}")
+        else:
+            logger.warning(f"⚠️ Failed to resend verification email to {user.email}")
+    except Exception as e:
+        logger.error(f"❌ Error resending verification email: {e}")
+    
+    return {
+        "status": "sent",
+        "message": "Verification email sent. Please check your inbox."
+    }
 
 
 @router.get("/me", response_model=UserOut)
@@ -258,6 +426,7 @@ def get_current_user_info(current_user: User = Depends(get_current_user)):
     return UserOut(
         id=current_user.id,
         email=current_user.email,
+        email_verified=getattr(current_user, 'email_verified', False),
         has_openai_key=bool(
             getattr(current_user, 'encrypted_openai_key', None) or 
             getattr(current_user, 'encrypted_api_key', None)
@@ -341,6 +510,7 @@ def update_api_keys(
     return {
         "id": current_user.id,
         "email": current_user.email,
+        "email_verified": getattr(current_user, 'email_verified', False),
         "has_openai_key": bool(
             getattr(current_user, 'encrypted_openai_key', None) or 
             getattr(current_user, 'encrypted_api_key', None)
@@ -381,6 +551,7 @@ def update_single_api_key(
     return UserOut(
         id=current_user.id,
         email=current_user.email,
+        email_verified=getattr(current_user, 'email_verified', False),
         has_openai_key=True,
         has_anthropic_key=bool(getattr(current_user, 'encrypted_anthropic_key', None)),
         has_google_key=bool(getattr(current_user, 'encrypted_google_key', None)),

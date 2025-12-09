@@ -84,7 +84,7 @@ export default function APIKeyPrompt({ onOpenSettings }) {
                     Why do I need API keys?
                   </h3>
                   <p className="text-xs text-[var(--text-muted)] leading-relaxed">
-                    PrivateGPT uses your own API keys to connect to AI models. This means you only pay for what you use and have full control over your data.
+                    HippoSync uses your own API keys to connect to AI models. This means you only pay for what you use and have full control over your data.
                   </p>
                 </div>
               </div>

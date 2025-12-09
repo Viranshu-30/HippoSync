@@ -557,7 +557,7 @@ export default function Chat({ user }) {
         <header className="border-b border-[var(--border-subtle)] p-4 flex items-center justify-between glass-strong">
           <div className="flex flex-col gap-1">
             <h1 className="font-semibold text-lg text-[var(--text-primary)]">
-              {thread ? thread.title : 'PrivateGPT'}
+              {thread ? thread.title : 'HippoSync'}
             </h1>
             
             {/* Model Dropdown */}

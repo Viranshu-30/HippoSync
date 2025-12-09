@@ -1,6 +1,6 @@
 """
-Enhanced models.py with multi-provider support and flexible API key storage.
-Supports OpenAI, Anthropic Claude, and Google Gemini.
+Enhanced models.py with email verification support
+✅ Added: email_verified, verification_token, verification_token_expires
 """
 from sqlalchemy import (
     Column, Integer, String, DateTime, func,
@@ -19,13 +19,22 @@ class ModelProvider(str, enum.Enum):
 
 
 class User(Base):
-    """User model with encrypted API keys for multiple providers"""
+    """User model with encrypted API keys and email verification"""
     __tablename__ = "users"
     
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String, unique=True, index=True, nullable=False)
     hashed_password = Column(String, nullable=False)
     is_active = Column(Boolean, default=True)
+    
+    # ========================================================================
+    # EMAIL VERIFICATION FIELDS (NEW)
+    # ========================================================================
+    email_verified = Column(Boolean, default=False, nullable=False)
+    verification_token = Column(String(255), nullable=True, index=True)
+    verification_token_expires = Column(DateTime(timezone=True), nullable=True)
+    verified_at = Column(DateTime(timezone=True), nullable=True)
+    # ========================================================================
     
     # Multi-provider API keys (all encrypted)
     encrypted_openai_key = Column(Text, nullable=True)
@@ -109,7 +118,7 @@ class Thread(Base):
     # Model configuration
     active_model = Column(String, default="gpt-4o-mini")
     active_provider = Column(SQLEnum(ModelProvider), default=ModelProvider.OPENAI)
-    temperature = Column(String, default="1.0")  # Store as string for precision
+    temperature = Column(String, default="1.0")
     system_prompt = Column(Text, nullable=True)
     
     # Metadata
@@ -130,9 +139,9 @@ class Message(Base):
     thread_id = Column(Integer, ForeignKey("threads.id", ondelete="CASCADE"), index=True, nullable=False)
     
     # Message content
-    sender = Column(String, nullable=False)  # user, assistant, system
+    sender = Column(String, nullable=False)
     content = Column(Text, nullable=True)
-    type = Column(String, default="text")  # text, file, image, error
+    type = Column(String, default="text")
     
     # File attachment metadata
     filename = Column(String, nullable=True)
