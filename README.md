@@ -81,10 +81,8 @@ DATABASE_URL=sqlite:///./app.db
 SECRET_KEY=your-secret-key-here-minimum-32-characters
 ACCESS_TOKEN_EXPIRE_MINUTES=10080
 
-# AI Provider API Keys (At least one required)
+# AI Provider API Key
 OPENAI_API_KEY=sk-your-openai-key
-# ANTHROPIC_API_KEY=sk-ant-your-anthropic-key
-# GOOGLE_API_KEY=your-google-key
 
 # Web Search (Optional)
 TAVILY_API_KEY=tvly-your-tavily-key
@@ -120,10 +118,10 @@ CORS_ORIGINS=http://localhost:5173,http://localhost:3000
 
 ```bash
 # Start MemMachine server (in a separate terminal)
-memmachine serve
+memmachine-server
 ```
 
-**MemMachine will start on `http://localhost:8001`**
+**MemMachine will start on `http://localhost:8000`**
 
 #### 2.6 Start Backend Server
 
